@@ -323,21 +323,20 @@ jQuery.fn = jQuery.prototype = {
 	end: function() {
 		return this.prevObject || this.constructor();
 	},
-
-	// For internal use only.
-	// Behaves like an Array's method, not like a jQuery method.
+	//这是供JQ内部使用的数组方法
 	push: push,
 	sort: arr.sort,
 	splice: arr.splice
 };
 ```
 
-#### toArray
+#### toArray：转数组
 
 `.toArray()`将当前`jQuery`对象转换成真正的数组，执行时通过方法`call()`指定方法执行的环境，即关键字`this`所引用的对象.
 
 ```
 slice.call( this ) == [].slice.call(this);
+slice如果不传参就是截取整个数组  call 改变了截取环境 返回的就是this所对应的数组
 ```
 
 也就是说该方法在执行时，会将原本属于数组对象的`slice`方法交给当前执行环境（`this`所引用的对象）的对象去处理。
@@ -362,13 +361,13 @@ fn1.call(fn2);     //输出 1   fn2调用了fn1方法，并将fn2对象this指�
 
 call底层实现: https://www.cnblogs.com/donghezi/p/9742778.html
 
-#### get
+#### get：获取集合
 
 `.get([index])：`中括号表示可选。该方法返回当前`jQuery`对象中指定位置的元素或包含了全部元素的数组。如果指定参数`index`，则返回一个单独的元素；参数`index`从0开始，并且支持负数，负数表示从末尾开始算起。
 
 `183行首先判断`num`是否小于0，则用`length+num`重新计算下标，然后用`[]`获取指定位置的元素。如果`num`大于等于0，则直接返回指定位置的元素。否则调用`[].slice.call(this)`返回所有元素，存入空数组里。
 
-#### pushStack
+#### pushStack：对象入栈
 
 191行:`this.constructor`指向构造函数`jQuery()`,通过merge方法把参数`elems` 合并到`this.constructor`并赋给新的`jQuery`对象`ret`
 
@@ -431,13 +430,21 @@ map:function( callback ) {
 	},
 ```
 
-传入一个函数,然后返回部分着来看 先要执行 jQuery.map( this, function( elem, i ) )也就是下面的map函数
+传入一个函数,然后返回部分拆分来看 
+
+1.this.pushStack（fn）  把函数结果赋给新的jq对象
+
+2.fn = jQuery.map( 
+
+参数一：this, 
+
+参数二：function( elem, i ) {return callback.call( elem, i, elem );} ) 就是把传进来的JQ对象elem 每个元素都执行一遍回调函数，并把索引和elem 当做回调参数，参考jquery.map 方法中的 callback( elems[ i ], i, arg );
 
 第447行
 
-第一参数:待遍历的数组或对象；
+第一参数:待遍历的数组或对象；也就是上面的this
 
-第二参数:回调函数，会在数组每个元素或对象上执行
+第二参数:回调函数，也就是上面的参数二
 
 第三参数:仅限jQuery内部使用，如果调用jQuery.map()时传入了参数arg，则会传给回调函数callback
 
@@ -464,7 +471,243 @@ map: function( elems, callback, arg ) {
 				}
 			}
 		}
+		//防止ret数组是个二维数组 apply会把ret拆分一项项和空数组执行concat合并 这样就成了一个一维数组
 		return concat.apply( [], ret );
 	},
+```
+
+#### slice
+
+call方法: 
+语法：call([thisObj[,arg1[, arg2[,   [,.argN]]]]]) 
+定义：调用一个对象的一个方法，以另一个对象替换当前对象。 
+说明： 
+call 方法可以用来代替另一个对象调用一个方法。call 方法可将一个函数的对象上下文从初始的上下文改变为由 thisObj 指定的新对象。 
+如果没有提供 thisObj 参数，那么 Global 对象被用作 thisObj。 
+
+apply方法： 
+语法：apply([thisObj[,argArray]]) 
+定义：应用某一对象的一个方法，用另一个对象替换当前对象。 
+说明： 
+如果 argArray 不是一个有效的数组或者不是 arguments 对象，那么将导致一个 TypeError。 
+如果没有提供 argArray 和 thisObj 任何一个参数，那么 Global 对象将被用作 thisObj， 并且无法被传递任何参数。
+
+他们的区别在于：
+
+对于apply和call两者在作用上是相同的，但两者在参数上有区别的。
+对于第一个参数意义都一样，但对第二个参数：
+apply传入的是一个参数数组，也就是将多个参数组合成为一个数组传入，而call则作为call的参数传入（从第二个参数开始）。
+如 func.call(func1,var1,var2,var3)对应的apply写法为：func.apply(func1,[var1,var2,var3])同时使用apply的好处是可以直接将当前函数的arguments对象作为apply的第二个参数传入。
+```
+slice: function() {
+		return this.pushStack( slice.apply( this, arguments ) );
+	},
+```
+
+这段代码的作用其实也就是把jq对象转化成数组，再通过pushStack函数返回一个新的JQ对象
+
+#### first，last，eq
+
+```
+first: function() {
+		return this.eq( 0 );
+	},
+
+	last: function() {
+		return this.eq( -1 );
+	},
+
+	eq: function( i ) {
+		var len = this.length,
+			j = +i + ( i < 0 ? len : 0 );
+		return this.pushStack( j >= 0 && j < len ? [ this[ j ] ] : [] );
+	},
+```
+
+eq先获取合集长度存入len，然后如果传入参数为正数，j = j + i ，否则 j = j + len - - i
+
+最终 j大于0 并且小于总长度，就根据索引取值this[j]并放在数组中调用pushStack，否则结果为空数组
+
+#### end：返回前一个选择栈
+
+```
+end: function() {
+// // 返回当前jQuery对象的prevObject对象，简单直接
+	return this.prevObject || this.constructor();
+},
+//在pushStack()函数中 pushStack会将传入的DOM元素创建为一个新的jQuery对象，并将这个新的jQuery对象的prevObject属性进行修改。
+
+```
+
+举例：
+
+选择所有段落，找到这些段落中的 span 元素，然后将它们恢复为P标签，并把P标签设置为两像素的红色边框：
+
+一般情况下$("p").find("span")这时候的this应该是对应的span集合，但find和eq等方法都使用了pushStack函数 在这个函数中有这样的一行代码：194行 `ret.prevObject = this;`
+
+pushStack中用到了jQuery.merge()方法，是将第2个参数中的各个参数拼接到第1个参数的尾部，第一个参数this.constructor()，其实是创建了一个空的jQuery对象。然后我们将当前对象赋值给新对象的prevObject属性，最后返回新对象，这样，新对象就持有了一个对之前对象的引用，这样就实现了一个维护前一个jQuery对象的栈。 调用end（）后就把之前的对象返回
+
+```
+$("p").find("span").end().css("border", "2px red solid");
+```
+
+参考：<https://www.cnblogs.com/MnCu8261/p/6046532.html> 
+
+<https://oychao.github.io/2017/07/13/javascript/29_jquery_prevobject/> 
+
+## 六.240： jQ的继承方法
+
+### `$.extend 和$.fn.extend`
+
+#### 1.只有一个对象字面量参数时  
+
+```
+$.extend({ //这种是扩展工具方法
+    aaa:function(){
+    	alert(1)
+    }
+})
+$.aaa() //弹出1
+$.fn.extend({ //扩展JQ实例方法
+    bbb:function(){
+        alert(2)
+    }
+})
+$().bbb() //弹出2
+为什么连等同一个函数却能不同的操作？因为不同的调用方式，其中的this是不同的
+因为$是JQ函数，$.fn是JQ原型对象
+$.extend()->this指向$ -> this.aaa() -> $.aaa()
+$.fn.extend() -> this指向JQ原型 -> this.bbb() ->原型调方法必定是创建对象去调用是->$().bbb()
+```
+
+#### 2.多个字面量 后面的对象都扩展到第一个参数里面
+
+```
+var a = {}
+$.extend(a,{name:'zhangsan'},{age:18})
+
+console.log(a) //{name:'zhangsan',age:18}
+```
+
+#### 3.深拷贝
+
+```
+//当第一个参数为true时 开启深拷贝
+var a = {}
+var b = {haha:{xixi:345}}
+$.extend(true,a,{name:'zhangsan'},{age:18},b)
+b.haha.xixi = 789
+console.log(a) //{age: 18,haha: {xixi: 345},name: "zhangsan"}
+console.log(b) //{haha: {xixi:789}}
+```
+
+### 源码解析
+
+```
+jQuery.extend = jQuery.fn.extend = function() {
+//声明变量
+/*
+    变量 options：指向某个源对象。
+    变量 name：表示某个源对象的某个属性名。
+    变量 src：表示目标对象的某个属性的原始值。
+    变量 copy：表示某个源对象的某个属性的值。
+    变量 copyIsArray：指示变量 copy 是否是数组。
+    变量 clone：表示深度复制时原始值的修正值。
+    变量 target：指向目标对象,申明时先临时用第一个参数值。
+    变量 i：表示源对象的起始下标，申明时先临时用第二个参数值。
+    变量 length：表示参数的个数，用于修正变量 target。
+    变量 deep：指示是否执行深度复制，默认为 false。
+    ps:源对象指的是把自己的值付给别人的对象；目标对象指的是被源对象赋值的对象
+    */
+
+	var options, name, src, copy, copyIsArray, clone,
+	//默认目标元素为第一个参数
+		target = arguments[ 0 ] || {},
+		//目标元素的参数索引
+		i = 1,
+		length = arguments.length,
+		deep = false;
+//判断是否深拷贝 
+	if ( typeof target === "boolean" ) {
+		deep = target;
+		//目标元素就是第二个参数
+		target = arguments[ i ] || {};
+		//参数索引一起改变
+		i++;
+	}
+
+// 判断是否是对象或者函数 不是 目标元素赋值一个空对象
+	if ( typeof target !== "object" && !isFunction( target ) ) {
+		target = {};
+	}
+//判断是不是扩展插件 也就是判断参数数量
+	if ( i === length ) {
+		target = this;
+		i--;
+	}
+	for ( ; i < length; i++ ) {
+//判断参数是否有意义 防止为null
+		if ( ( options = arguments[ i ] ) != null ) {
+			for ( name in options ) {
+			//获取源对象上，属性名对应的属性
+				copy = options[ name ];
+//如果复制值copy 与目标对象target相等，
+//为了避免深度遍历时死循环，因此不会覆盖目标对象的同名属性。
+				if ( name === "__proto__" || target === copy ) {
+					continue;
+				}
+			//深浅拷贝
+			//递归参数存在 并且后面是有效参数 并且是对象或者数组
+				if ( deep && copy && ( jQuery.isPlainObject( copy ) ||
+					( copyIsArray = Array.isArray( copy ) ) ) ) {
+					src = target[ name ];
+					//如果是数组
+					if ( copyIsArray && !Array.isArray( src ) ) {
+						clone = [];
+					} else if ( !copyIsArray && !jQuery.isPlainObject( src ) ) {
+						clone = {};
+					} else {
+						clone = src;
+					}
+					copyIsArray = false;
+			//递归拷贝
+					target[ name ] = jQuery.extend( deep, clone, copy );
+				} else if ( copy !== undefined ) {
+					target[ name ] = copy;
+				}
+			}
+		}
+	}
+	return target;
+};
+```
+
+```
+if ( name === "__proto__" || target === copy ) {
+	continue;
+}
+举例：
+var a = {}
+$.extend(a,{name:a})
+这里a 被重复引用 有了上面的判断 会直接跳过
+```
+
+```
+if ( copyIsArray && !Array.isArray( src ) ) {
+	clone = [];
+} else if ( !copyIsArray && !jQuery.isPlainObject( src ) ) {
+	clone = {};
+} else {
+	clone = src;
+}
+这里这个条件判断是什么意思呢 -> !Array.isArray( src )，!jQuery.isPlainObject( src )
+意思就是当属性值是个数组，并且目标对象上没有 就重新穿件一个新的数组或者对象，否则就沿用目标对象src
+举例：
+var a = {name:{job:'it'}}
+var b = {name:{age:18}}
+$.extent(true,a,b)
+console.log(a) //{name:{job:'it',age:18}}
+要是没有这判断条件 程序就判断为对象后就会直接新建一个空对象然后复制 相当于把之前的结果覆盖了
+打印a 的结果就是 {name:{age:18}} 
 ```
 
