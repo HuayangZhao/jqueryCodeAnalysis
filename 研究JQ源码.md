@@ -701,7 +701,7 @@ if ( copyIsArray && !Array.isArray( src ) ) {
 	clone = src;
 }
 这里这个条件判断是什么意思呢 -> !Array.isArray( src )，!jQuery.isPlainObject( src )
-意思就是当属性值是个数组，并且目标对象上没有 就重新穿件一个新的数组或者对象，否则就沿用目标对象src
+意思就是当属性值是个数组，并且目标对象上没有 就重新创建一个新的数组或者对象，否则就沿用目标对象src
 举例：
 var a = {name:{job:'it'}}
 var b = {name:{age:18}}
@@ -709,5 +709,186 @@ $.extent(true,a,b)
 console.log(a) //{name:{job:'it',age:18}}
 要是没有这判断条件 程序就判断为对象后就会直接新建一个空对象然后复制 相当于把之前的结果覆盖了
 打印a 的结果就是 {name:{age:18}} 
+```
+
+## 七.JQ扩展函数
+
+ 如果只为$.extend()指定了一个参数，则意味着参数target被省略。此时，target就是jQuery对象本身。通过这种方式，我们可以为全局对象jQuery添加新的函数。 
+
+参考：<https://www.cnblogs.com/guaidianqiao/p/7771427.html> 
+
+```
+jQuery.extend( {
+
+	// 生成唯一JQ字符串(内部)
+	expando: "jQuery" + ( version + Math.random() ).replace( /\D/g, "" ),
+	// DOM是否加载完(内部)
+	isReady: true,
+	//抛出异常	
+	error: function( msg ) {
+		throw new Error( msg );
+	},
+	//空函数  有啥用暂时不知道
+	noop: function() {},
+	//是否为对象自变量  纯粹的对象"，就是该对象是通过 "{}" 或 "new Object" 创建的
+	//之所以要判断是不是 plainObject，是为了跟其他的 JavaScript对象如 null，
+	//数组，宿主对象（documents）等作区分，因为这些用 typeof 都会返回object。
+	isPlainObject: function( obj ) {
+		var proto, Ctor;
+		//判断非对象 排除掉明显不是obj的以及一些宿主对象如Window
+		if ( !obj || toString.call( obj ) !== "[object Object]" ) {
+			return false;
+		}
+		//如果没有继承属性，则返回 null 。
+		proto = getProto( obj );
+
+		// 没有原型的对象 也就是普通对象 如object.create（null）就返回 true
+		if ( !proto ) {
+			return true;
+		}
+
+		//以下判断通过 new Object 方式创建的对象
+     	//判断 proto 是否有 constructor 属性，如果有就让 Ctor 的值为 proto.constructor
+     	//如果是 Object 函数创建的对象，Ctor 在这里就等于 Object 构造函数
+		Ctor = hasOwn.call( proto, "constructor" ) && proto.constructor;
+		
+		// 在这里判断 Ctor 构造函数是不是 Object 构造函数，用于区分自定义构造函数和 Object 构造函数
+		return typeof Ctor === "function" && fnToString.call( Ctor ) === ObjectFunctionString;
+	},
+//是否为空的对象
+	isEmptyObject: function( obj ) {
+		var name;
+
+		for ( name in obj ) {
+			return false;
+		}
+		return true;
+	},
+
+	//  全局解析JS
+	globalEval: function( code, options ) {
+		DOMEval( code, { nonce: options && options.nonce } );
+	},
+//遍历集合
+	each: function( obj, callback ) {
+		var length, i = 0;
+
+		if ( isArrayLike( obj ) ) {
+			length = obj.length;
+			for ( ; i < length; i++ ) {
+				if ( callback.call( obj[ i ], i, obj[ i ] ) === false ) {
+					break;
+				}
+			}
+		} else {
+			for ( i in obj ) {
+				if ( callback.call( obj[ i ], i, obj[ i ] ) === false ) {
+					break;
+				}
+			}
+		}
+
+		return obj;
+	},
+
+	// 去前后空格
+	trim: function( text ) {
+		return text == null ?
+			"" :
+			( text + "" ).replace( rtrim, "" );
+	},
+
+	// 类数组转真数组
+	makeArray: function( arr, results ) {
+		var ret = results || [];
+
+		if ( arr != null ) {
+			if ( isArrayLike( Object( arr ) ) ) {
+				jQuery.merge( ret,
+					typeof arr === "string" ?
+					[ arr ] : arr
+				);
+			} else {
+				push.call( ret, arr );
+			}
+		}
+
+		return ret;
+	},
+//数组的indexOf
+	inArray: function( elem, arr, i ) {
+		return arr == null ? -1 : indexOf.call( arr, elem, i );
+	},
+
+	//合并数组
+	merge: function( first, second ) {
+		var len = +second.length,
+			j = 0,
+			i = first.length;
+
+		for ( ; j < len; j++ ) {
+			first[ i++ ] = second[ j ];
+		}
+
+		first.length = i;
+
+		return first;
+	},
+//过滤新数组
+	grep: function( elems, callback, invert ) {
+		var callbackInverse,
+			matches = [],
+			i = 0,
+			length = elems.length,
+			callbackExpect = !invert;
+
+		// Go through the array, only saving the items
+		// that pass the validator function
+		for ( ; i < length; i++ ) {
+			callbackInverse = !callback( elems[ i ], i );
+			if ( callbackInverse !== callbackExpect ) {
+				matches.push( elems[ i ] );
+			}
+		}
+
+		return matches;
+	},
+
+	// 映射新数组
+	map: function( elems, callback, arg ) {
+		var length, value,
+			i = 0,
+			ret = [];
+
+		// Go through the array, translating each of the items to their new values
+		if ( isArrayLike( elems ) ) {
+			length = elems.length;
+			for ( ; i < length; i++ ) {
+				value = callback( elems[ i ], i, arg );
+
+				if ( value != null ) {
+					ret.push( value );
+				}
+			}
+
+		// Go through every key on the object,
+		} else {
+			for ( i in elems ) {
+				value = callback( elems[ i ], i, arg );
+
+				if ( value != null ) {
+					ret.push( value );
+				}
+			}
+		}
+		// Flatten any nested arrays
+		return concat.apply( [], ret );
+	},
+	// 唯一标识符(内部)
+	guid: 1,
+
+	//备用附加属性
+	support: support
+} );
 ```
 
